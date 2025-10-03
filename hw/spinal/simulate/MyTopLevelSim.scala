@@ -1,39 +1,32 @@
 import fmcapb4.{Config, FmcApb4Top}
+import mybus.fmc.sim.FmcAsyncDriver
 import spinal.core._
 import spinal.core.sim._
+import spinal.lib.bus.amba4.axilite.sim.AxiLite4Driver
 
 object MyTopLevelSim extends App {
   Config.sim.compile(FmcApb4Top()).doSim { dut =>
     // Fork a process to generate the reset and the clock on the dut
     dut.clockDomain.forkStimulus(period = 10)
 
-    dut.io.fmc_slave.NE #= true
-    dut.io.fmc_slave.NWE #= true
-    dut.io.fmc_slave.NOE #= true
+//    val nRest = new Bool()
+//    val clock = new Bool()
+////    val fmcAsyncClock = ClockDomain(clock, nRest)
+//    ClockDomain(clock, nRest).forkStimulus(10)
+
+    val driver = FmcAsyncDriver(dut.io.fmc_slave, dut.clockDomain)
+    driver.reset()
+
+    println("=== Start ===")
+    val reg0 = driver.read(0x10000L, true)
+    val reg1 = driver.read(0x20000L, true)
+    println(reg0)
+    println(reg1)
+
+//    driver.write(0x10000L, 0xA5A5A5, true)
     dut.clockDomain.waitSampling(10)
 
-    // 测试读取第一个外设 (地址 0x10000)
-    println("=== 测试读取第一个外设 (0x10000) ===")
-    dut.io.fmc_slave.NE #= false     // 片选有效
-    dut.io.fmc_slave.NOE #= false    // 读使能有效
-    dut.io.fmc_slave.A #= 0x10000L >> 2  // 设置地址
-    dut.clockDomain.waitSampling(1)
-    waitUntil(dut.io.fmc_slave.NWAIT.toBoolean)
-    dut.clockDomain.waitSampling(5)
-    dut.io.fmc_slave.NE #= true
-    dut.io.fmc_slave.NOE #= true
-    dut.clockDomain.waitSampling(10)
-
-//    // 测试读取第二个外设 (地址 0x20000)
-    println("=== 测试读取第二个外设 (0x20000) ===")
-    dut.io.fmc_slave.NE #= false     // 片选有效
-    dut.io.fmc_slave.NOE #= false    // 读使能有效
-    dut.io.fmc_slave.A #= 0x20000L >> 2    // 设置地址
-    dut.clockDomain.waitSampling(1)
-    waitUntil(dut.io.fmc_slave.NWAIT.toBoolean)
-    dut.io.fmc_slave.NE #= true
-    dut.io.fmc_slave.NOE #= true
-    dut.clockDomain.waitSampling(30)
-
+    driver.reset()
+    println("=== End ===")
   }
 }

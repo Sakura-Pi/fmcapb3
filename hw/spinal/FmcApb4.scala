@@ -2,9 +2,10 @@ package fmcapb4
 
 import spinal.core._
 import spinal.lib._
-import mybus.Apb4Bus
-import mybus.FmcBusAsync
+import mybus.{Apb4Bus, Debugger}
+import mybus.fmc.FmcBusAsync
 import peripheral.Apb4Peripheral
+
 import scala.collection.mutable.ArrayBuffer
 
 case class SlaveConfig(baseAddr: Long, factory: () => Apb4Peripheral)
@@ -14,6 +15,7 @@ object FmcApb4 {
   class Builder {
     private val slaves = ArrayBuffer[SlaveConfig]()
     private var upstream: Option[FmcBusAsync] = None
+    private var debugger: Option[Debugger] = None
 
     def address(baseAddr: Long, factory: () => Apb4Peripheral): Builder = {
       slaves += SlaveConfig(baseAddr, factory)
@@ -25,20 +27,25 @@ object FmcApb4 {
       this
     }
 
+    def link(upstreamBus: FmcBusAsync, debugger: Debugger): Builder = {
+      this.upstream = Some(upstreamBus)
+      this.debugger = Some(debugger)
+      this
+    }
+
     def build(): FmcApb4 = {
       val bus = FmcApb4(slaves.toArray)
-      
+
       // connect slaves to the bus
       for((element, i) <- bus.io.apb4.zipWithIndex) {
         val slave = slaves(i).factory()
         element <> slave.getApb4Interface
       }
-      
+
       // connect to upstream
-      upstream.foreach { fmcBus =>
-        bus.io.fmc <> fmcBus
-      }
-      
+      upstream.foreach { fmcBus => bus.io.fmc <> fmcBus }
+      debugger.foreach { debugger => bus.io.debugger <> debugger }
+
       bus
     }
   }
@@ -51,6 +58,7 @@ case class FmcApb4(slaves: Array[SlaveConfig]) extends Component {
   val io = new Bundle {
     val fmc = slave(FmcBusAsync())
     val apb4 = Vec(master(Apb4Bus()), slaves.length)
+    val debugger = slave(Debugger())
   }
 
   //   Flexible Memory Controller SRAM Read Stat Table
@@ -73,7 +81,7 @@ case class FmcApb4(slaves: Array[SlaveConfig]) extends Component {
   //   +---------+----------+----+-----+-----+-------+---------+---------+-------------+--------------+--------------+------+---------+--------+--------+---------+
 
   io.fmc.NWAIT := True
-  for(i <- io.apb4) {
+  for (i <- io.apb4) {
     i.PSEL := False
     i.PENABLE := False
     i.PADDR := 0
@@ -85,7 +93,17 @@ case class FmcApb4(slaves: Array[SlaveConfig]) extends Component {
   val select = Reg(UInt(log2Up(slaves.length) bits)) init 0
   val rdata = Reg(UInt(32 bits)) init 0xE9AAAA
 
-  io.fmc.D := rdata
+  io.debugger.hub(0) := io.fmc.NWE
+  io.debugger.hub(1) := io.fmc.NOE
+  io.debugger.hub(2) := io.fmc.NE
+  io.debugger.hub(3) := currentState.asBits(0)
+  io.debugger.hub(4) := currentState.asBits(1)
+  io.debugger.hub(5) := (io.fmc.A << 2 === slaves(0).baseAddr)
+
+  // 为剩余的位赋默认值0
+  for(i <- 6 until 32) {
+    io.debugger.hub(i) := False
+  }
 
   when(currentState === FmcApb4State.IDLE) {
     for(i <- io.apb4) {
@@ -132,62 +150,10 @@ case class FmcApb4(slaves: Array[SlaveConfig]) extends Component {
   }
 
   when(currentState === FmcApb4State.WAIT_RELEASE) {
-    // 等待 FMC 控制信号释放，表示读操作完成
-    when(io.fmc.NE || io.fmc.NOE || !io.fmc.NWE) {
+    io.fmc.D := rdata
+    when(io.fmc.NOE || !io.fmc.NWE) {
       currentState := FmcApb4State.IDLE
     }
   }
-
-  //switch(currentState) {
-
-    // Idle
-//    is(FmcApb4State.IDLE) {
-//      for(i <- io.apb4) {
-//        i.PSEL := False
-//        i.PENABLE := False
-//        i.PADDR := 0
-//        i.PWDATA := 0
-//        i.PWRITE := False
-//      }
-//    }
-
-//    is(FmcApb4State.APB_SETUP) {
-//
-//    }
-
-
-  //}
-
-
-//  for(element <- io.apb4) {
-//    // FMC到APB4信号转换
-//    element.PADDR := io.fmc.A.resized
-//    element.PWDATA := io.fmc.D.resized // 从双向信号读取数据
-//    // APB4控制信号
-//    element.PSEL := !io.fmc.NE
-//    element.PWRITE := isWrite
-//    element.PENABLE := isRead || isWrite
-//
-//    // 读操作时，将APB4的读数据输出到FMC数据线
-//    when(isRead && element.PREADY) {
-//      io.fmc.D := element.PRDATA
-//    }
-//  }
-
-//  // FMC到APB4信号转换
-//  io.apb4.PADDR := io.fmc.A.resized
-//  io.apb4.PWDATA := io.fmc.D.resized // 从双向信号读取数据
-//
-//  // APB4控制信号
-//  io.apb4.PSEL := !io.fmc.NE
-//  io.apb4.PWRITE := is_write
-//  io.apb4.PENABLE := is_read || is_write
-//
-//  // 读操作时，将APB4的读数据输出到FMC数据线
-//  when(is_read && io.apb4.PREADY) {
-//    io.fmc.D := io.apb4.PRDATA
-//  } otherwise {
-////    io.fmc_data := U(0, 32 bits)
-//  }
 
 }
