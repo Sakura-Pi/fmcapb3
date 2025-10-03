@@ -2,23 +2,30 @@ package fmcapb4
 
 import spinal.core._
 import spinal.lib._
-import mybus.{Apb4Bus, Debugger}
+import mybus.Debugger
 import mybus.fmc.FmcBusAsync
 import peripheral.Apb4Peripheral
+import spinal.lib.bus.amba4.apb.{Apb4, Apb4Config}
 
 import scala.collection.mutable.ArrayBuffer
 
-case class SlaveConfig(baseAddr: Long, factory: () => Apb4Peripheral)
+case class Apb4BindConfig(baseAddr: Long,
+                          factory: Apb4BindConfig => Apb4Peripheral,
+                          apb4cfg: Apb4Config)
 
 object FmcApb4 {
 
-  class Builder {
-    private val slaves = ArrayBuffer[SlaveConfig]()
+  class Builder(addressWidth: Int, dataWidth: Int, selWidth: Int) {
+    private val slaves = ArrayBuffer[Apb4BindConfig]()
+    private val slaves_inst = ArrayBuffer[Apb4Peripheral]()
     private var upstream: Option[FmcBusAsync] = None
     private var debugger: Option[Debugger] = None
+    private val apb4cfg = Apb4Config(addressWidth, dataWidth, selWidth, false, false)
 
-    def address(baseAddr: Long, factory: () => Apb4Peripheral): Builder = {
-      slaves += SlaveConfig(baseAddr, factory)
+    def address(baseAddr: Long, factory: Apb4BindConfig => Apb4Peripheral): Builder = {
+      val slave = Apb4BindConfig(baseAddr, factory, apb4cfg)
+      slaves += slave
+      slaves_inst += factory(slave)
       this
     }
 
@@ -34,12 +41,12 @@ object FmcApb4 {
     }
 
     def build(): FmcApb4 = {
-      val bus = FmcApb4(slaves.toArray)
+      val bus = FmcApb4(apb4cfg, slaves.toArray, slaves_inst.toArray, (1 << (addressWidth - selWidth)) - 1)
 
       // connect slaves to the bus
-      for((element, i) <- bus.io.apb4.zipWithIndex) {
-        val slave = slaves(i).factory()
-        element <> slave.getApb4Interface
+      for(element <- slaves_inst) {
+        bus.io.apb4 >> element.getApb4Interface
+//        bus.io.apb4.PREADY := element.getApb4Interface.PREADY
       }
 
       // connect to upstream
@@ -50,14 +57,18 @@ object FmcApb4 {
     }
   }
 
-  def builder(): Builder = new Builder()
+  def builder(addressWidth: Int, dataWidth: Int, selWidth: Int): Builder
+    = new Builder(addressWidth, dataWidth, selWidth)
 }
 
-case class FmcApb4(slaves: Array[SlaveConfig]) extends Component {
+case class FmcApb4(apb4cfg: Apb4Config,
+                   slaves: Array[Apb4BindConfig],
+                   slaves_inst: Array[Apb4Peripheral],
+                   selMask: Int) extends Component {
 
   val io = new Bundle {
     val fmc = slave(FmcBusAsync())
-    val apb4 = Vec(master(Apb4Bus()), slaves.length)
+    val apb4 = master(Apb4(apb4cfg))
     val debugger = slave(Debugger())
   }
 
@@ -80,18 +91,18 @@ case class FmcApb4(slaves: Array[SlaveConfig]) extends Component {
   // 6 |                                           Wait Until NE = 1 && NOE = 1 && NWE = 1   Then Jump To Stat 0                                                  |
   //   +---------+----------+----+-----+-----+-------+---------+---------+-------------+--------------+--------------+------+---------+--------+--------+---------+
 
-  io.fmc.NWAIT := True
-  for (i <- io.apb4) {
-    i.PSEL := False
-    i.PENABLE := False
-    i.PADDR := 0
-    i.PWDATA := 0
-    i.PWRITE := False
-  }
-
   val currentState = Reg(FmcApb4State()) init FmcApb4State.IDLE
   val select = Reg(UInt(log2Up(slaves.length) bits)) init 0
   val rdata = Reg(UInt(32 bits)) init 0xE9AAAA
+  val localAddr = Reg(UInt(apb4cfg.addressWidth - apb4cfg.selWidth bits)) init 0
+  val localSelId = Reg(UInt(apb4cfg.selWidth bits)) init 0
+
+  io.fmc.NWAIT := !False
+  io.apb4.PSEL := 0
+  io.apb4.PWRITE := False
+  io.apb4.PENABLE := False
+  io.apb4.PADDR := 0
+  io.apb4.PWDATA := 0
 
   io.debugger.hub(0) := io.fmc.NWE
   io.debugger.hub(1) := io.fmc.NOE
@@ -106,29 +117,29 @@ case class FmcApb4(slaves: Array[SlaveConfig]) extends Component {
   }
 
   when(currentState === FmcApb4State.IDLE) {
-    for(i <- io.apb4) {
-      i.PSEL := False
-      i.PENABLE := False
-      i.PADDR := 0
-      i.PWDATA := 0
-      i.PWRITE := False
-    }
+    io.apb4.PSEL := 0
+    io.apb4.PWRITE := False
+    io.apb4.PENABLE := False
+    io.apb4.PADDR := 0
+    io.apb4.PWDATA := 0
   }
 
   when(currentState === FmcApb4State.IDLE && !io.fmc.NE && !io.fmc.NOE && io.fmc.NWE) {
 
+    // 使用地址高位自动解码SEL ID
+    val address = UInt(28 bits)
+
+    address := io.fmc.A << 2
+    localAddr := (address & U(selMask)).resized
+    localSelId := (address >> (apb4cfg.addressWidth - apb4cfg.selWidth)).resized
+
     val foundMatch = False
-
-    // simple address decoder
     for((element, i) <- slaves.zipWithIndex) {
-      val baseAddr26 = U(element.baseAddr & 0xFFFFFFF, 28 bits)  // clamp low 28 bits
-
-      when(baseAddr26 === io.fmc.A << 2) {
-        select := U(i, log2Up(slaves.length) bits)
-        io.apb4(select).PSEL := True
-        io.apb4(select).PENABLE := False
-        io.apb4(select).PADDR := io.fmc.A.resized
-        io.fmc.NWAIT := io.apb4(select).PREADY
+      when(localSelId === slaves_inst(i).getSelId) {
+        io.apb4.PSEL := localSelId.asBits
+        io.apb4.PENABLE := False
+        io.apb4.PADDR := localAddr.resized
+        io.fmc.NWAIT := io.apb4.PREADY
         currentState := FmcApb4State.APB_ACCESS
         foundMatch := True
       }
@@ -140,11 +151,11 @@ case class FmcApb4(slaves: Array[SlaveConfig]) extends Component {
   }
 
   when(currentState === FmcApb4State.APB_ACCESS) {
-    io.apb4(select).PSEL := True
-    io.apb4(select).PENABLE := True
-    io.fmc.NWAIT := io.apb4(select).PREADY
-    rdata := io.apb4(select).PRDATA
-    when(io.apb4(select).PREADY === True) {
+    io.apb4.PSEL := localSelId.asBits
+    io.apb4.PENABLE := True
+    io.fmc.NWAIT := io.apb4.PREADY
+    rdata := io.apb4.PRDATA.asUInt
+    when(io.apb4.PREADY === True) {
       currentState := FmcApb4State.WAIT_RELEASE
     }
   }

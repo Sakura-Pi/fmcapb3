@@ -8,7 +8,7 @@ object MyTopLevelSim extends App {
     // Fork a process to generate the reset and the clock on the dut
     dut.clockDomain.forkStimulus(period = 10)
 
-    val driver = FmcAsyncDriver(dut.io.fmc_slave, dut.clockDomain)
+    val driver = FmcAsyncDriver(dut.io.fmc, dut.clockDomain)
     driver.reset()
 
     println("=== Start ===")
