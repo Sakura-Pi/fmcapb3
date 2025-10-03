@@ -2,17 +2,11 @@ import fmcapb4.{Config, FmcApb4Top}
 import mybus.fmc.sim.FmcAsyncDriver
 import spinal.core._
 import spinal.core.sim._
-import spinal.lib.bus.amba4.axilite.sim.AxiLite4Driver
 
 object MyTopLevelSim extends App {
   Config.sim.compile(FmcApb4Top()).doSim { dut =>
     // Fork a process to generate the reset and the clock on the dut
     dut.clockDomain.forkStimulus(period = 10)
-
-//    val nRest = new Bool()
-//    val clock = new Bool()
-////    val fmcAsyncClock = ClockDomain(clock, nRest)
-//    ClockDomain(clock, nRest).forkStimulus(10)
 
     val driver = FmcAsyncDriver(dut.io.fmc_slave, dut.clockDomain)
     driver.reset()
