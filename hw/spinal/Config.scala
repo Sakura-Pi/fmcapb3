@@ -1,4 +1,4 @@
-package fmcapb4
+package fmcapb3
 
 import spinal.core._
 import spinal.core.sim._

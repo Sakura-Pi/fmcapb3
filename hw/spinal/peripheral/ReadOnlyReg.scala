@@ -1,8 +1,17 @@
 package peripheral
-import fmcapb4.Apb4BindConfig
-import spinal.core._
 
-case class ReadOnlyReg(bind: Apb4BindConfig) extends Apb4Peripheral(bind) {
-  reg.read(B(0x5555AAAA, 32 bits), address = 0x00)
-  reg.read(B(0x12345678, 32 bits), address = 0x04)
+import spinal.core._
+import spinal.lib.bus.amba3.apb._
+import spinal.lib.slave
+
+case class ReadOnlyReg(apb3Config: Apb3Config, selId: Int) extends Component {
+
+  val io = new Bundle {
+    val apb = slave(Apb3(apb3Config))
+  }
+
+  val regif = Apb3SlaveFactory(io.apb, selId)
+  regif.read(B(0x12345678, 32 bits), 0x4000)
+  regif.read(B(0x0A050A05, 32 bits), 0x8000)
+
 }

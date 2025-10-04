@@ -1,10 +1,10 @@
-import fmcapb4.{Config, FmcApb4Top}
+import fmcapb3.{Config, FmcApb3Top}
 import mybus.fmc.sim.FmcAsyncDriver
 import spinal.core._
 import spinal.core.sim._
 
 object MyTopLevelSim extends App {
-  Config.sim.compile(FmcApb4Top()).doSim { dut =>
+  Config.sim.compile(FmcApb3Top()).doSim { dut =>
     // Fork a process to generate the reset and the clock on the dut
     dut.clockDomain.forkStimulus(period = 10)
 

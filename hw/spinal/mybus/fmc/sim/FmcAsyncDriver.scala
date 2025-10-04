@@ -2,9 +2,9 @@ package mybus.fmc.sim
 
 import spinal.core._
 import spinal.core.sim._
-import mybus.fmc.FmcBusAsync
+import mybus.fmc.Fmc
 
-case class FmcAsyncDriver(fmc: FmcBusAsync, clockDomain : ClockDomain) {
+case class FmcAsyncDriver(fmc: Fmc, clockDomain : ClockDomain) {
 
   private def n(value: Boolean): Boolean = {
     !value
