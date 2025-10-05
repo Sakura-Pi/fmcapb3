@@ -33,8 +33,6 @@ case class FmcDriver(fmc: Fmc, clockDomain : ClockDomain) {
   def read(addr: Long, wait: Boolean): Long = {
     select()
 
-    // RSH is bank select bit, ignore it
-    // because we supposed the bank is always 0
     fmc.A #= addr >> 2
 
     // set read signal
@@ -60,11 +58,7 @@ case class FmcDriver(fmc: Fmc, clockDomain : ClockDomain) {
     fmc.NWE #= n(true)
     fmc.NOE #= n(false)
 
-    // RSH is bank select bit, ignore it
-    // because we supposed the bank is always 0
     fmc.A #= addr >> 2
-//    fmc.D #= data
-//    clockDomain.waitSampling(40)
     for (i <- 0 until 40) {
       fmc.D #= data
       clockDomain.waitSampling(1)

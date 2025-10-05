@@ -11,6 +11,9 @@ case class ReadWriteReg() extends Component {
 
   val regif = Apb3SlaveFactory(io.apb, 0)
   val REG0 = Reg(UInt(32 bits)) init 0
+  val REG1 = Reg(UInt(32 bits)) init 0
   regif.readAndWrite(REG0, 0x0)
+  regif.read(REG1, 0x4)
 
+  REG1 := REG0 / 2
 }

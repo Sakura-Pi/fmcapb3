@@ -5,18 +5,18 @@ import spinal.lib._
 import mybus.fmc.{Fmc, FmcConfig}
 import spinal.lib.bus.amba3.apb._
 
-object FmcAsyncToApb3BridgePhase extends SpinalEnum {
+object FmcToApb3BridgePhase extends SpinalEnum {
   val IDLE, SETUP, ACCESS, ERROR = newElement
 }
 
-case class FmcAsyncToApb3Bridge(fmcConfig: FmcConfig, apb3Config: Apb3Config) extends Component {
+case class FmcToApb3Bridge(fmcConfig: FmcConfig, apb3Config: Apb3Config) extends Component {
 
   val io = new Bundle {
     val fmc = slave(Fmc(fmcConfig))
     val apb = master(Apb3(apb3Config))
   }
 
-  import FmcAsyncToApb3BridgePhase._
+  import FmcToApb3BridgePhase._
   assert(fmcConfig.addressWidth >= apb3Config.addressWidth, "APB size address is bigger than the FMC size address")
   assert(fmcConfig.dataWidth == apb3Config.dataWidth, "APB data width is not equal to FMC data width")
   assert(apb3Config.selWidth == 1, "HSEL width must be equal to 1")
