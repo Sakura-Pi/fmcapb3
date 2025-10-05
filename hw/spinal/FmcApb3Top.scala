@@ -36,7 +36,7 @@ case class FmcApb3Top() extends Component {
   Apb3Decoder(
     master = bridge.io.apb,
     slaves = List(
-      ReadWriteReg(apb3SlaveConfig, 0).io.apb     -> (0x4000, 1 KiB),
+      ReadWriteReg().io.apb     -> (0x4000, 1 KiB),
     )
   )
 

@@ -63,11 +63,16 @@ case class FmcDriver(fmc: Fmc, clockDomain : ClockDomain) {
     // RSH is bank select bit, ignore it
     // because we supposed the bank is always 0
     fmc.A #= addr >> 2
-    fmc.D #= data
-    clockDomain.waitSampling(40)
+//    fmc.D #= data
+//    clockDomain.waitSampling(40)
+    for (i <- 0 until 40) {
+      fmc.D #= data
+      clockDomain.waitSampling(1)
+    }
 
     // wait slave to response
     if(wait) {
+      fmc.D #= data
       clockDomain.waitSamplingWhere(fmc.NWAIT.toBoolean)
     }
 

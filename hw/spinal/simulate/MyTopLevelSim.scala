@@ -18,6 +18,7 @@ object MyTopLevelSim extends App {
     driver.write(0x10000L, 0x233333, true)
 
     reg0 = driver.read(0x10000L, true)
+    println(reg0)
     dut.clockDomain.waitSampling(10)
 
     driver.reset()
