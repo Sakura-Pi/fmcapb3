@@ -22,5 +22,5 @@ case class IPConfig() extends Component {
    */
   val regif = new Apb3SlaveFactory(io.apb, 0)
   regif.read(B(0x534B5250, 32 bits), 0x00)
-  regif.read(B(0x00000001, 32 bits), 0x01)
+  regif.read(B(0x00000001, 32 bits), 0x04)
 }

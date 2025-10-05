@@ -17,7 +17,7 @@ case class FmcToApb3Bridge(fmcConfig: FmcConfig, apb3Config: Apb3Config) extends
   }
 
   import FmcToApb3BridgePhase._
-  assert(fmcConfig.addressWidth >= apb3Config.addressWidth, "APB size address is bigger than the FMC size address")
+  assert(fmcConfig.addressWidth + 2 >= apb3Config.addressWidth, "APB size address is bigger than the FMC size address")
   assert(fmcConfig.dataWidth == apb3Config.dataWidth, "APB data width is not equal to FMC data width")
   assert(apb3Config.selWidth == 1, "HSEL width must be equal to 1")
 
@@ -40,7 +40,7 @@ case class FmcToApb3Bridge(fmcConfig: FmcConfig, apb3Config: Apb3Config) extends
       io.apb.PENABLE := False
 
       when(!io.fmc.NE) {
-        address := io.fmc.A
+        address := io.fmc.A << 2 // Address is word aligned
 
         // FMC Read
         when(!io.fmc.NOE && io.fmc.NWE) {

@@ -38,7 +38,7 @@ case class FmcApb3TopExample() extends Component {
     master = bridge.io.apb,
     slaves = List(
       IPConfig().io.apb          -> (0x0000, 1 KiB),
-      ws2812Controller.io.apb    -> (0x4000, 1 KiB),
+      ws2812Controller.io.apb    -> (0x10000, 1 KiB),
     )
   )
 }

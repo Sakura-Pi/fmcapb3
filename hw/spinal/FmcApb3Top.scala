@@ -15,7 +15,7 @@ case class FmcApb3Top() extends Component {
   private val ADDRESS_WIDTH = 28 // FMC Address Width is 26(addr) + 2 = 28
 
   private val apb3Config = Apb3Config(ADDRESS_WIDTH, DATA_WIDTH, 1)
-  private val fmcConfig = FmcConfig(ADDRESS_WIDTH, DATA_WIDTH)
+  private val fmcConfig = FmcConfig(ADDRESS_WIDTH - 2, DATA_WIDTH)
 
   val io = new Bundle {
     val fmc = slave(Fmc(fmcConfig))
