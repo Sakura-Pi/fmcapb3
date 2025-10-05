@@ -3,10 +3,7 @@ package mybus.fmc
 import spinal.core._
 import spinal.lib._
 
-case class FmcConfig(addressWidth: Int, dataWidth: Int) {
-
-}
-
+case class FmcConfig(addressWidth: Int, dataWidth: Int)
 case class Fmc(config: FmcConfig) extends Bundle with IMasterSlave {
 
   val A = UInt(config.addressWidth bits)
