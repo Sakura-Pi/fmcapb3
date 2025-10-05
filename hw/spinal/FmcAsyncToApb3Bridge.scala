@@ -24,22 +24,20 @@ case class FmcAsyncToApb3Bridge(fmcConfig: FmcConfig, apb3Config: Apb3Config) ex
   val phase = RegInit(IDLE)
   val write = Reg(Bool())
   val address = Reg(UInt(apb3Config.addressWidth bits))
-  val readData = Reg(Bits(fmcConfig.dataWidth bits)) init 0xE9AAAA
+  val readData = Reg(Bits(fmcConfig.dataWidth bits)) init 0
+  val writeData = Reg(Bits(fmcConfig.dataWidth bits)) init 0
 
   io.apb.PADDR := address.resized
   io.apb.PWRITE := write
-  io.apb.PWDATA := io.fmc.D
   io.fmc.NWAIT := io.apb.PREADY
   io.apb.PENABLE := False
-  io.fmc.D := readData
+  io.apb.PWDATA := writeData
+  readData := io.apb.PRDATA
 
   switch(phase) {
     is(IDLE) {
       io.apb.PSEL := B"0"
       io.apb.PENABLE := False
-//      io.apb.PWRITE := False
-//      io.apb.PADDR := 0
-//      io.apb.PWDATA := 0
 
       when(!io.fmc.NE) {
         address := io.fmc.A
@@ -53,6 +51,7 @@ case class FmcAsyncToApb3Bridge(fmcConfig: FmcConfig, apb3Config: Apb3Config) ex
         // FMC Write
         when(io.fmc.NOE && !io.fmc.NWE) {
           write := True
+          writeData := io.fmc.D
           phase := SETUP
         }
       }
@@ -66,11 +65,14 @@ case class FmcAsyncToApb3Bridge(fmcConfig: FmcConfig, apb3Config: Apb3Config) ex
       is(ACCESS) {
         io.apb.PSEL := B"1"
         io.apb.PENABLE := True
+        when(write) {
+          writeData := io.fmc.D
+        } otherwise {
+          io.fmc.D := readData
+        }
 
+        // Jump while FMC signal changes
         when(io.apb.PREADY) {
-          readData := io.apb.PRDATA
-
-          // Wait for signal changes
           when((write && io.fmc.NWE) || (!write && io.fmc.NOE)) {
             phase := io.apb.PSLVERROR ? ERROR | IDLE
           }

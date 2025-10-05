@@ -4,7 +4,7 @@ import spinal.core._
 import spinal.core.sim._
 import mybus.fmc.Fmc
 
-case class FmcAsyncDriver(fmc: Fmc, clockDomain : ClockDomain) {
+case class FmcDriver(fmc: Fmc, clockDomain : ClockDomain) {
 
   private def n(value: Boolean): Boolean = {
     !value
@@ -12,7 +12,7 @@ case class FmcAsyncDriver(fmc: Fmc, clockDomain : ClockDomain) {
 
   def reset(): Unit = {
     fmc.A #= 0
-    fmc.D #= 0
+    //fmc.D #= 0
     fmc.NOE #= n(false)
     fmc.NE  #= n(false)
     fmc.NWE #= n(false)

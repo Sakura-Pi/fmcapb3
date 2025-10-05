@@ -4,7 +4,7 @@ import spinal.core._
 import spinal.lib._
 import spinal.lib.bus.amba3.apb._
 import mybus.fmc.{Fmc, FmcConfig}
-import peripheral.{ReadOnlyReg}
+import peripheral.ReadWriteReg
 
 case class FmcApb3Top() extends Component {
 
@@ -36,15 +36,10 @@ case class FmcApb3Top() extends Component {
   Apb3Decoder(
     master = bridge.io.apb,
     slaves = List(
-      ReadOnlyReg(apb3SlaveConfig, 0).io.apb -> (0x4000, 1 KiB)
+      ReadWriteReg(apb3SlaveConfig, 0).io.apb     -> (0x4000, 1 KiB),
     )
   )
 
-//  FmcApb3.builder(ADDRESS_WIDTH, DATA_WIDTH, SEL_MASK)
-//    .address(0x0010000L, ReadOnlyReg)
-//    .address(0x0020000L, ReadOnlyReg2)
-//    .link(io.fmc, io.debugger)
-//    .build()
 }
 
 object FmcApb3Verilog extends App {
